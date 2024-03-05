@@ -1,161 +1,124 @@
-using System.Collections;
-using System.Collections.Generic;
+
 using UnityEngine;
 
-public class Player : MonoBehaviour, IFoodObjectParent
+public class Player : MonoBehaviour, IHeldObjectParent
 {
-    Vector2 _moveDirection;
-    Vector2 _lastWalkDirection; 
+    // Fields
+    private Vector2 _moveDirection;
+    private Vector2 _lastWalkDirection;
 
-    [SerializeField] float _moveSpeed;
-    [SerializeField] GameInput _gameInput;
+    [SerializeField] private float _moveSpeed;
+    [SerializeField] private GameInput _gameInput;
 
-    const string WALK_LEFT = "player_walk_left";
-    const string WALK_UP = "player_walk_up";
-    const string WALK_DOWN = "player_walk_down";
-    const string WALK_RIGHT = "player_walk_left";
+    private Animator _animator;
+    private Rigidbody2D _rigidbody;
+    private SpriteRenderer _spriteRenderer;
 
-    const string IDLE_LEFT = "player_idle_left";
-    const string IDLE_UP = "player_idle_up";
-    const string IDLE_DOWN = "player_idle_down";
-    const string IDLE_RIGHT = "player_idle_left";
+    [SerializeField] private OverlapCircleDetection _overlapCircleDetection;
+    [SerializeField] private Transform _handPosition;
+    private HeldObject _heldObject;
 
-    Animator _animator;
-    Rigidbody2D _rigidbody;
-    SpriteRenderer _spriteRenderer;
-
-    [SerializeField] OverlapCircleDetection _overlapCircleDetection;
-
-
-    private FoodObject _foodObject;
-    [SerializeField] private Transform _handPosition; 
+    // Animation strings
+    private const string WALK_LEFT = "player_walk_left";
+    private const string WALK_RIGHT = "player_walk_right";
+    private const string WALK_UP = "player_walk_up";
+    private const string WALK_DOWN = "player_walk_down";
+    private const string IDLE_LEFT = "player_idle_left";
+    private const string IDLE_RIGHT = "player_idle_right";
+    private const string IDLE_UP = "player_idle_up";
+    private const string IDLE_DOWN = "player_idle_down";
 
     private void Start()
+    {
+        InitializeComponents();
+        _gameInput.OnInteractAction += GameInput_OnInteractAction;
+    }
+
+    private void InitializeComponents()
     {
         _animator = GetComponent<Animator>();
         _rigidbody = GetComponent<Rigidbody2D>();
         _spriteRenderer = GetComponent<SpriteRenderer>();
-
-        _gameInput.OnInteractAction += GameInput_OnInteractAction;
-    }
-
-    private void GameInput_OnInteractAction(object sender, System.EventArgs e)
-    {
-        _overlapCircleDetection.DetectObject(this);
     }
 
     private void Update()
     {
         GetPlayerInput();
-
-        
-        SetWalkAnimations(_moveDirection);
+        SetAnimationState();
     }
 
     private void FixedUpdate()
     {
-
         MovePlayer();
     }
 
-    void GetPlayerInput()
+    #region Input and Movement
+    private void GetPlayerInput()
     {
         _moveDirection = _gameInput.GetMovementVectorNormalized();
     }
 
-    void MovePlayer()
+    private void MovePlayer()
     {
-        _rigidbody.velocity = _moveDirection * _moveSpeed* Time.fixedDeltaTime;
-        //transform.Translate(_moveDirection * _moveSpeed * Time.deltaTime);
+        _rigidbody.velocity = _moveDirection * _moveSpeed * Time.fixedDeltaTime;
+    }
+    #endregion
+
+    #region Animation Handling
+    private void SetAnimationState()
+    {
+        string animationName = _moveDirection.magnitude > 0 ? GetWalkAnimation() : GetIdleAnimation();
+        _animator.Play(animationName);
+        UpdateLastWalkDirection();
     }
 
-    void SetWalkAnimations(Vector2 moveDirection)
+    private string GetWalkAnimation()
     {
-        if (moveDirection.magnitude > 0)
-        {
-            if (moveDirection.x < 0 && moveDirection.y == 0)
-            {
-                _spriteRenderer.flipX = false;
-                _animator.Play(WALK_LEFT);
-                _lastWalkDirection = Vector2.left;
-            }
-
-            if (moveDirection.x > 0 && moveDirection.y == 0)
-            {
-                _spriteRenderer.flipX = true;
-                _animator.Play(WALK_RIGHT);
-                _lastWalkDirection = Vector2.right;
-            }
-
-            if (moveDirection.y > 0 )
-            {
-                _animator.Play(WALK_UP);
-                _lastWalkDirection = Vector2.up;
-            }
-
-            if (moveDirection.y < 0)
-            {
-                _animator.Play(WALK_DOWN);
-                _lastWalkDirection = Vector2.down;
-            }
-        }
-        else
-        {
-            // Player is not moving, set appropriate idle animation
-            SetIdleAnimation(_lastWalkDirection);
-        }
+        if (_moveDirection.x < 0) return WALK_LEFT;
+        if (_moveDirection.x > 0) return WALK_RIGHT;
+        if (_moveDirection.y > 0) return WALK_UP;
+        if (_moveDirection.y < 0) return WALK_DOWN;
+        return GetIdleAnimation();
     }
 
-    void SetIdleAnimation(Vector2 walkDirection)
+    private string GetIdleAnimation()
     {
-        // Determine the last non-zero movement direction and set the appropriate idle animation
-        if (walkDirection.x < 0)
-        {
-            _animator.Play(IDLE_LEFT);
-        }
-        else if (walkDirection.x > 0)
-        {
-            _animator.Play(IDLE_RIGHT);
-        }
-        else if (walkDirection.y > 0)
-        {
-            _animator.Play(IDLE_UP);
-        }
-        else if (walkDirection.y < 0)
-        {
-            _animator.Play(IDLE_DOWN);
-        }
-        else
-        {
-            // If no movement, set a default idle animation (e.g., IDLE_DOWN)
-            _animator.Play(IDLE_DOWN);
-        }
+        if (_lastWalkDirection == Vector2.left) return IDLE_LEFT;
+        if (_lastWalkDirection == Vector2.right) return IDLE_RIGHT;
+        if (_lastWalkDirection == Vector2.up) return IDLE_UP;
+        if (_lastWalkDirection == Vector2.down) return IDLE_DOWN;
+        return IDLE_DOWN; // Default idle state
     }
 
-    // Getter method for the food object's transform, though the method name might suggest returning the FoodObject's transform instead of the countertop's.
-    public Transform GetFoodObjectTransform()
+    private void UpdateLastWalkDirection()
     {
-        return _handPosition;
+        if (_moveDirection != Vector2.zero)
+        {
+            _lastWalkDirection = _moveDirection;
+            _spriteRenderer.flipX = _moveDirection.x > 0;
+        }
+    }
+    #endregion
+
+    #region Interaction
+    private void GameInput_OnInteractAction(object sender, System.EventArgs e)
+    {
+        _overlapCircleDetection.DetectObject(this);
+    }
+    #endregion
+
+    #region IHeldObjectParent Implementation
+    public Transform GetHeldObjectTransform() => _handPosition;
+
+    public void SetHeldObject(HeldObject heldObject)
+    {
+        _heldObject = heldObject;
     }
 
-    // Setter method to set the food object. It's clear and straightforward.
-    public void SetFoodObject(FoodObject foodObject)
-    {
-        _foodObject = foodObject;
-    }
+    public HeldObject GetHeldObject() => _heldObject;
 
-    // Getter method for the food object. It provides a good way to access the private field _foodObject from other classes.
-    public FoodObject GetFoodObject()
-    {
-        return _foodObject;
-    }
+    public void ClearHeldObject() => _heldObject = null;
 
-    // Method to clear the reference to the food object. Simple and effective for resetting the state.
-    public void ClearFoodObject()
-    {
-        _foodObject = null;
-    }
-
-    public bool HasFoodObject() { return _foodObject != null; }
-
+    public bool HasHeldObject() => _heldObject != null;
+    #endregion
 }

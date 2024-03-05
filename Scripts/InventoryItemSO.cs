@@ -1,9 +1,7 @@
-//using System.Collections;
-//using System.Collections.Generic;
 using UnityEngine;
 
 [CreateAssetMenu()]
-public class FoodSO : ScriptableObject
+public class InventoryItemSO : ScriptableObject
 {
     public Transform prefab;
     public Sprite sprite;

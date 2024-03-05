@@ -4,32 +4,35 @@ public class OverlapCircleDetection : MonoBehaviour
 {
     [SerializeField] private LayerMask _interactableLayerMask;
     [SerializeField] private float _interactionRadius = 1f;
-    float _brightnessFactor = 1.2f;
-    private CircleCollider2D _thisCircleCollider;
-    private Color _originalColor; 
+    [SerializeField] private float _brightnessFactor = 1.2f;
+    private CircleCollider2D _circleCollider;
+    private Color _originalColor;
 
     private void Start()
     {
-        _thisCircleCollider = GetComponent<CircleCollider2D>();
+        SetupCircleCollider();
+    }
 
-        if (_thisCircleCollider != null)
+    private void SetupCircleCollider()
+    {
+        _circleCollider = GetComponent<CircleCollider2D>();
+        if (_circleCollider)
         {
-            _thisCircleCollider.radius = _interactionRadius;
+            _circleCollider.radius = _interactionRadius;
         }
         else
         {
-            Debug.LogWarning("CircleCollider2D component not found on this GameObject.");
+            Debug.LogWarning("CircleCollider2D component not found on this GameObject.", this);
         }
     }
+
     public void DetectObject(Player player)
     {
         Collider2D collider = Physics2D.OverlapCircle(transform.position, _interactionRadius, _interactableLayerMask);
-        if (collider != null)
+        if (collider)
         {
             Debug.Log(collider.gameObject.name);
-
-            ClearCounter clearCounter;
-            if (collider.gameObject.TryGetComponent<ClearCounter>(out clearCounter))
+            if (collider.TryGetComponent(out ClearCounter clearCounter))
             {
                 clearCounter.Interact(player);
             }
@@ -44,47 +47,26 @@ public class OverlapCircleDetection : MonoBehaviour
         }
     }
 
-
     private void OnDrawGizmosSelected()
     {
         Gizmos.color = Color.black;
         Gizmos.DrawWireSphere(transform.position, _interactionRadius);
     }
 
-
     private void OnTriggerEnter2D(Collider2D other)
     {
-        // Check if the detected object is on the interactable layer mask
-        if (((1 << other.gameObject.layer) & _interactableLayerMask) != 0)
+        if (((1 << other.gameObject.layer) & _interactableLayerMask) != 0 && other.TryGetComponent<Renderer>(out var renderer))
         {
-            Renderer renderer = other.gameObject.GetComponent<Renderer>();
-            if (renderer != null)
-            {
-                _originalColor = renderer.material.color;
-                Color brighterColor = _originalColor * _brightnessFactor;
-                renderer.material.color = brighterColor;
-            }
-            else
-            {
-                Debug.LogWarning("Renderer component not found on detected object.");
-            }
+            _originalColor = renderer.material.color;
+            renderer.material.color *= _brightnessFactor;
         }
     }
 
     private void OnTriggerExit2D(Collider2D other)
     {
-        if (((1 << other.gameObject.layer) & _interactableLayerMask) != 0)
+        if (((1 << other.gameObject.layer) & _interactableLayerMask) != 0 && other.TryGetComponent<Renderer>(out var renderer))
         {
-            Renderer renderer = other.gameObject.GetComponent<Renderer>();
-            if (renderer != null)
-            {
-                renderer.material.color = _originalColor;
-            }
-            else
-            {
-                Debug.LogWarning("Renderer component not found on detected object.");
-            }
+            renderer.material.color = _originalColor;
         }
     }
-
 }
